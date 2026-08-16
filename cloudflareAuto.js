@@ -147,12 +147,40 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-blink-features=AutomationControlled',
-            `--window-position=${-1920 + (instanceIndex * 400)},${(instanceIndex % 2) * 200}`,
+            // Background mode: pojok kanan-bawah monitor utama (1920x1080), cascade per instance
+            `--window-position=${640 + (instanceIndex * 40)},${360 + (instanceIndex * 40)}`,
             '--window-size=1280,720',
             '--disable-infobars',
             '--proxy-server=socks5://127.0.0.1:40000'
         ]
     });
+
+    // Background mode: turunkan z-order window ke belakang semua window lain
+    // (tetap kelihatan di pojok, tapi gak popup/steal fokus setelah launch).
+    // Pakai -EncodedCommand agar tidak menulis file .ps1 (anti AV delete).
+    try {
+        const psLower = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class W {
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+}
+"@
+$p = Get-Process -Id ${browser.process().pid} -ErrorAction SilentlyContinue
+if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, [IntPtr]1, 0, 0, 0, 0, 0x0001 -bor 0x0002) | Out-Null }
+`;
+        setTimeout(() => {
+            try {
+                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${Buffer.from(psLower, 'utf16le').toString('base64')}`, { stdio: 'ignore' });
+                console.log(`[Info-${instanceIndex}] Window di-push ke belakang (z-order bawah).`);
+            } catch (e) {
+                console.log(`[Warn-${instanceIndex}] Gagal push z-order: ${e.message}`);
+            }
+        }, 4000);
+    } catch (e) {
+        console.log(`[Warn-${instanceIndex}] Gagal setup push z-order: ${e.message}`);
+    }
 
     try {
         const pages = await browser.pages();
@@ -262,7 +290,7 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
             for (let t = 0; t < 15; t++) {
                 try {
                     isTurnstileSolved = await page.evaluate(() => {
-                        const el = document.querySelector('[name="cf-turnstile-response"]');
+                        const el = document.querySelector('[name="cf_challenge_response"], [name="cf-turnstile-response"]');
                         return el && el.value && el.value.length > 10;
                     });
                 } catch (e) {}
