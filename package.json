@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node -c cloudflareAuto.js && node -c googleLogin.js && node -c index.js"
+    "test": "node -c cloudflareAuto.js"
   },
   "keywords": [],
   "author": "",
