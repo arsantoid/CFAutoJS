@@ -147,8 +147,9 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-blink-features=AutomationControlled',
-            // Background mode: pojok kanan-bawah monitor utama (1920x1080), cascade per instance
-            `--window-position=${640 + (instanceIndex * 40)},${360 + (instanceIndex * 40)}`,
+            // Background mode: pojok kanan-bawah monitor utama (1920x1080), cascade 300px per instance
+            // (offset 40px terlalu kecil — window 1280x720 tumpuk 95%, yang lain ketutup)
+            `--window-position=${560 + (instanceIndex % 3) * 300},${280 + Math.floor(instanceIndex / 3) * 220}`,
             '--window-size=1280,720',
             '--disable-infobars',
             '--proxy-server=socks5://127.0.0.1:40000'
