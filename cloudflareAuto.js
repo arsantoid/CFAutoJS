@@ -155,9 +155,12 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
         ]
     });
 
-    // Background mode: turunkan z-order window ke belakang semua window lain
-    // (tetap kelihatan di pojok, tapi gak popup/steal fokus setelah launch).
+    // Background mode: jaga z-order window tetap di belakang semua window lain
+    // (tetap kelihatan di pojok, tapi gak popup/steal fokus). Chrome activate
+    // window saat navigasi (signup->dashboard->verifikasi), jadi push sekali
+    // gak cukup — interval guard jalan sampai browser mati.
     // Pakai -EncodedCommand agar tidak menulis file .ps1 (anti AV delete).
+    let lowerTimer = null;
     try {
         const psLower = `
 Add-Type @"
@@ -170,16 +173,17 @@ public class W {
 $p = Get-Process -Id ${browser.process().pid} -ErrorAction SilentlyContinue
 if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, [IntPtr]1, 0, 0, 0, 0, 0x0001 -bor 0x0002) | Out-Null }
 `;
-        setTimeout(() => {
+        const pushLower = () => {
             try {
                 execSync(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${Buffer.from(psLower, 'utf16le').toString('base64')}`, { stdio: 'ignore' });
-                console.log(`[Info-${instanceIndex}] Window di-push ke belakang (z-order bawah).`);
             } catch (e) {
-                console.log(`[Warn-${instanceIndex}] Gagal push z-order: ${e.message}`);
+                if (lowerTimer) { clearInterval(lowerTimer); lowerTimer = null; } // chrome mati, stop guard
             }
-        }, 4000);
+        };
+        lowerTimer = setInterval(pushLower, 5000);
+        console.log(`[Info-${instanceIndex}] Z-order guard aktif (push ke belakang tiap 5 detik).`);
     } catch (e) {
-        console.log(`[Warn-${instanceIndex}] Gagal setup push z-order: ${e.message}`);
+        console.log(`[Warn-${instanceIndex}] Gagal setup z-order guard: ${e.message}`);
     }
 
     try {
