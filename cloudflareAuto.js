@@ -199,13 +199,27 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
         await page.goto('https://dash.cloudflare.com/sign-up', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(e => console.log(`[Warn] Gagal load sign-up: ${e.message}, lanjut...`));
 
         // Tunggu input selector dengan toleransi ID dinamis
+        // domcontentloaded bisa selesai sebelum form React render / CF challenge kelar,
+        // jadi pakai retry loop (toleran render lambat) alih-alih waitForSelector sekali.
         console.log('[Info] Mengisi formulir pendaftaran Cloudflare...');
-        const emailInput = await page.waitForSelector('input[type="email"], input[autocomplete="email"], input[name="email"]', { timeout: 20000 });
+        const emailSel = 'input[type="email"], input[autocomplete="email"], input[name="email"]';
+        const passSel = 'input[type="password"], input[autocomplete="new-password"], input[name="password"]';
+        let emailInput = null;
+        for (let i = 0; i < 20 && !emailInput; i++) {
+            emailInput = await page.$(emailSel);
+            if (!emailInput) await new Promise(r => setTimeout(r, 3000));
+        }
+        if (!emailInput) throw new Error('Email input tidak muncul setelah 60s (mungkin CF challenge hang)');
         await emailInput.focus();
         await emailInput.evaluate(el => el.value = '');
         await emailInput.type(mailAcc.address, { delay: 100 });
 
-        const passwordInput = await page.waitForSelector('input[type="password"], input[autocomplete="new-password"], input[name="password"]', { timeout: 20000 });
+        let passwordInput = null;
+        for (let i = 0; i < 20 && !passwordInput; i++) {
+            passwordInput = await page.$(passSel);
+            if (!passwordInput) await new Promise(r => setTimeout(r, 3000));
+        }
+        if (!passwordInput) throw new Error('Password input tidak muncul setelah 60s');
         await passwordInput.focus();
         await passwordInput.evaluate(el => el.value = '');
         await passwordInput.type(cfPassword, { delay: 100 });
