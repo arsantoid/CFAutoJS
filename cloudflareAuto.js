@@ -143,6 +143,7 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
         executablePath: getExecutablePath(),
         headless: false,
         ignoreDefaultArgs: ['--enable-automation'],
+        protocolTimeout: 120000, // CDP call timeout; naikkan dari default 180s jadi toleran renderer freeze (RAM/CPU penuh saat run paralel bot lain)
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
