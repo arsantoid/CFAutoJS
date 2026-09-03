@@ -196,7 +196,7 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
         await page.setViewport({ width: 1280, height: 720 });
         
         console.log('[Info] Membuka Cloudflare Sign Up...');
-        await page.goto('https://dash.cloudflare.com/sign-up', { waitUntil: 'networkidle2' });
+        await page.goto('https://dash.cloudflare.com/sign-up', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(e => console.log(`[Warn] Gagal load sign-up: ${e.message}, lanjut...`));
 
         // Tunggu input selector dengan toleransi ID dinamis
         console.log('[Info] Mengisi formulir pendaftaran Cloudflare...');
@@ -366,8 +366,8 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
         const verifyLink = await getVerificationLink(mailAcc);
         if (verifyLink) {
             console.log(`\n[Info-${instanceIndex}] Link verifikasi ditemukan. Mengunjungi link...`);
-            await page.goto(verifyLink, { waitUntil: 'networkidle2', timeout: 120000 }).catch(e => {
-                console.log(`[Warn-${instanceIndex}] Timeout navigasi verifikasi, namun akan melanjutkan...`);
+            await page.goto(verifyLink, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(e => {
+                console.log(`[Warn-${instanceIndex}] Timeout navigasi verifikasi (${e.message}), namun akan melanjutkan...`);
             });
             
             console.log(`\x1b[33m%s\x1b[0m`, `[PENTING] Jika muncul CAPTCHA di halaman verifikasi, SILAKAN KLIK MANUAL!`);
@@ -383,7 +383,7 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
             }
             
             // Reload untuk memastikan session cookie status verified terbaca
-            await page.goto('https://dash.cloudflare.com/?verified=true', { waitUntil: 'networkidle2' });
+            await page.goto('https://dash.cloudflare.com/?verified=true', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
             await new Promise(r => setTimeout(r, 5000));
             console.log(`[Sukses] Email berhasil diverifikasi di Cloudflare.`);
         } else {
@@ -391,7 +391,7 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
         }
 
         // Get IDs & Poll for Email Verification Status
-        await page.goto('https://dash.cloudflare.com/', { waitUntil: 'networkidle2' });
+        await page.goto('https://dash.cloudflare.com/', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
         
         let cfId = 'TIDAK_DITEMUKAN';
         let userId = 'TIDAK_DITEMUKAN';
@@ -487,7 +487,7 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
         
         // Navigasi ke API tokens page
             await page.goto('https://dash.cloudflare.com/profile/api-tokens', { 
-                waitUntil: 'networkidle2', timeout: 60000 
+                waitUntil: 'domcontentloaded', timeout: 45000 
             }).catch(e => console.log(`[Warn-${instanceIndex}] Timeout load tokens page, lanjut...`));
             await new Promise(r => setTimeout(r, 5000));
             
@@ -583,7 +583,7 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
             console.log(`[Peringatan-${instanceIndex}] Gagal verifikasi email (Error 1211) setelah batas waktu. Mencoba RESEND EMAIL...`);
             try {
                 // Ke beranda untuk klik resend
-                await page.goto('https://dash.cloudflare.com/', { waitUntil: 'networkidle2', timeout: 60000 }).catch(()=>{});
+                await page.goto('https://dash.cloudflare.com/', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(()=>{});
                 await new Promise(r => setTimeout(r, 3000));
                 
                 await page.evaluate(() => {
@@ -598,11 +598,11 @@ if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, 
                 
                 if (newLink) {
                     console.log(`[Info-${instanceIndex}] Link verifikasi BARU ditemukan. Mengunjungi...`);
-                    await page.goto(newLink, { waitUntil: 'networkidle2', timeout: 120000 }).catch(()=>{});
+                    await page.goto(newLink, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(()=>{});
                     await new Promise(r => setTimeout(r, 5000));
                     
                     // Kembali ke tokens
-                    await page.goto('https://dash.cloudflare.com/profile/api-tokens', { waitUntil: 'networkidle2', timeout: 60000 }).catch(()=>{});
+                    await page.goto('https://dash.cloudflare.com/profile/api-tokens', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(()=>{});
                     await new Promise(r => setTimeout(r, 3000));
                     
                     // Coba buat token lagi
