@@ -157,35 +157,42 @@ async function autoCreateCloudflare(accCsv, tokenCsv, provider, instanceIndex = 
         ]
     });
 
-    // Background mode: jaga z-order window tetap di belakang semua window lain
-    // (tetap kelihatan di pojok, tapi gak popup/steal fokus). Chrome activate
-    // window saat navigasi (signup->dashboard->verifikasi), jadi push sekali
-    // gak cukup — interval guard jalan sampai browser mati.
+    // Background mode: jaga window Chrome TIDAK BISA di-activate (WS_EX_NOACTIVATE)
+    // + selalu di belakang (HWND_BOTTOM) + hidden dari taskbar (WS_EX_TOOLWINDOW).
+    // WS_EX_NOACTIVATE = window gak bisa ke-depan meski navigasi CF atau game fullscreen.
+    // Puppeteer tetap jalan (CDP protocol, bukan window activation).
     // Pakai -EncodedCommand agar tidak menulis file .ps1 (anti AV delete).
     let lowerTimer = null;
     try {
-        const psLower = `
-Add-Type @"
+        const psGuard = `Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 public class W {
-  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr h, int n, int v);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
 }
 "@
 $p = Get-Process -Id ${browser.process().pid} -ErrorAction SilentlyContinue
-if ($p -and $p.MainWindowHandle -ne 0) { [W]::SetWindowPos($p.MainWindowHandle, [IntPtr]1, 0, 0, 0, 0, 0x0001 -bor 0x0002) | Out-Null }
+if ($p -and $p.MainWindowHandle -ne 0) {
+  $h = $p.MainWindowHandle
+  $ex = [W]::GetWindowLong($h, -20)
+  $newEx = $ex -bor 0x08000080
+  [W]::SetWindowLong($h, -20, $newEx) | Out-Null
+  [W]::SetWindowPos($h, [IntPtr]1, 0, 0, 0, 0, 0x0023) | Out-Null
+}
 `;
-        const pushLower = () => {
+        const applyGuard = () => {
             try {
-                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${Buffer.from(psLower, 'utf16le').toString('base64')}`, { stdio: 'ignore' });
+                execSync(`powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${Buffer.from(psGuard, 'utf16le').toString('base64')}`, { stdio: 'ignore' });
             } catch (e) {
                 if (lowerTimer) { clearInterval(lowerTimer); lowerTimer = null; } // chrome mati, stop guard
             }
         };
-        lowerTimer = setInterval(pushLower, 5000);
-        console.log(`[Info-${instanceIndex}] Z-order guard aktif (push ke belakang tiap 5 detik).`);
+        lowerTimer = setInterval(applyGuard, 5000);
+        console.log(`[Info-${instanceIndex}] Background guard aktif (WS_EX_NOACTIVATE + HWND_BOTTOM tiap 5s).`);
     } catch (e) {
-        console.log(`[Warn-${instanceIndex}] Gagal setup z-order guard: ${e.message}`);
+        console.log(`[Warn-${instanceIndex}] Gagal setup background guard: ${e.message}`);
     }
 
     try {
